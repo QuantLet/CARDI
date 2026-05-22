@@ -1,0 +1,411 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb, booktabs, longtable}
+\usepackage{natbib}
+\usepackage{hyperref}
+
+\title{Methodological Notes for Event Tests on Daily CARDI}
+\author{CARDI Project}
+\date{May 19, 2026}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+
+This note documents the econometric methods implemented in
+\texttt{Code/Plot\_Code/Event\_test.R}. The goal is to test whether
+carbon-related regulatory events are associated with structural changes in the
+daily CARDI time series. The script uses three daily CARDI series:
+\[
+\text{CARDI}_{1P,t}, \qquad \text{CARDI}_{5P,t}, \qquad \text{CARDI}_{10P,t}.
+\]
+
+The script implements four empirical components:
+\begin{enumerate}
+  \item event clustering and overlap diagnostics;
+  \item known-breakpoint Chow tests;
+  \item interrupted time-series regressions with Newey--West standard errors;
+  \item two-regime Markov-switching regime analysis.
+\end{enumerate}
+
+It also preserves a reference-style event-dummy regression based on smoothed
+CARDI log changes, with the important modification that event-dummy coefficients
+are reported using Newey--West standard errors.
+
+\section{Data}
+
+Let \( y_t^{(q)} \) denote the CARDI series for quantile level
+\(q \in \{1P,5P,10P\}\). The daily CARDI data are loaded from:
+\[
+\texttt{Data/Processed/FRM\_Carbon\_risk.csv}.
+\]
+
+The event data are loaded from:
+\[
+\texttt{Data/raw/Important\_Carbon\_Events.xlsx}.
+\]
+
+Let \( \mathcal{E} = \{e_1,\ldots,e_J\} \) denote the set of event dates.
+If an event occurs on a non-trading day, the script maps the event to the
+nearest observed CARDI trading date.
+
+\section{Event Clustering}
+
+Several policy events occur close to one another. Treating nearby events as
+independent shocks can make local event-window tests difficult to interpret.
+The script therefore constructs event clusters before running the main tests.
+
+Let the sorted event dates be:
+\[
+e_1 \leq e_2 \leq \cdots \leq e_J.
+\]
+For a configurable clustering threshold \(G\), currently set to 30 calendar
+days, event \(e_j\) belongs to the same cluster as \(e_{j-1}\) if
+\[
+e_j - e_{j-1} \leq G.
+\]
+Otherwise, \(e_j\) starts a new cluster.
+
+For each cluster \(c\), the script records:
+\[
+\left(
+\text{cluster\_id}_c,\;
+\text{start}_c,\;
+\text{end}_c,\;
+\text{representative\_date}_c,\;
+N_c
+\right),
+\]
+where \(N_c\) is the number of events in the cluster. The representative event
+date is the first event date in the cluster.
+
+\section{Known-Breakpoint Chow Test}
+
+\subsection{Motivation}
+
+The Chow test evaluates whether regression coefficients are stable across a
+known breakpoint. The test was introduced by \citet{chow1960}. In this
+application, each event date is treated as a known candidate breakpoint.
+
+\subsection{Local Event Window}
+
+For an event date \(e\) and a symmetric trading-day window \(h\), the local
+sample is:
+\[
+\mathcal{T}(e,h)
+= \{t: -h \leq \tau_t(e) \leq h\},
+\]
+where \(\tau_t(e)\) is the trading-day distance between date \(t\) and the
+nearest CARDI trading date for event \(e\).
+
+\subsection{Restricted and Unrestricted Models}
+
+For each CARDI variable \(y_t^{(q)}\), the restricted model is:
+\begin{equation}
+y_t^{(q)}
+= \alpha + \beta t + u_t.
+\end{equation}
+
+The unrestricted model allows both the intercept and slope to change after the
+event:
+\begin{equation}
+y_t^{(q)}
+= \alpha + \beta t
++ \gamma D_t(e)
++ \delta \left[t \times D_t(e)\right]
++ u_t,
+\end{equation}
+where:
+\[
+D_t(e) =
+\begin{cases}
+1, & t \geq e,\\
+0, & t < e.
+\end{cases}
+\]
+
+\subsection{Test Statistic}
+
+Let \(RSS_R\) be the residual sum of squares from the restricted model and
+\(RSS_U\) be the residual sum of squares from the unrestricted model. The Chow
+statistic is:
+\begin{equation}
+F
+=
+\frac{(RSS_R - RSS_U)/q}{RSS_U/(n-k_U)},
+\end{equation}
+where \(q\) is the number of restrictions, \(n\) is the local sample size, and
+\(k_U\) is the number of parameters in the unrestricted model.
+
+The null hypothesis is:
+\[
+H_0: \gamma = 0 \quad \text{and} \quad \delta = 0.
+\]
+
+Rejecting \(H_0\) indicates evidence of a known structural break around the
+event date.
+
+\section{Interrupted Time-Series Regressions}
+
+\subsection{Motivation}
+
+Interrupted time-series models are commonly used to estimate whether an
+intervention is associated with an immediate change, a persistent level shift,
+or a trend change. See \citet{bernal2017} for a tutorial treatment of segmented
+regression designs for intervention analysis.
+
+\subsection{Regression Specification}
+
+For each CARDI variable \(y_t^{(q)}\), event \(e\), and local window
+\(\mathcal{T}(e,h)\), the script estimates:
+\begin{equation}
+y_t^{(q)}
+= \alpha
++ \beta_1 \text{Pulse}_{t,e}
++ \beta_2 \text{Post}_{t,e}
++ \beta_3 \text{Trend}_{t,e}
++ \varepsilon_t.
+\end{equation}
+
+The event variables are defined as:
+\begin{align}
+\text{Pulse}_{t,e}
+&=
+\mathbf{1}\{t=e\},\\
+\text{Post}_{t,e}
+&=
+\mathbf{1}\{t>e\},\\
+\text{Trend}_{t,e}
+&=
+\max\{\tau_t(e),0\}.
+\end{align}
+
+The coefficients have the following interpretation:
+\begin{itemize}
+  \item \(\beta_1\): same-day event shock;
+  \item \(\beta_2\): persistent post-event level shift;
+  \item \(\beta_3\): post-event trend change.
+\end{itemize}
+
+\subsection{Newey--West Standard Errors}
+
+Because daily CARDI is a time series, residuals may be serially correlated and
+heteroskedastic. The script therefore reports Newey--West heteroskedasticity
+and autocorrelation consistent standard errors \citep{neweywest1987}.
+
+Let \(X\) be the matrix of regressors and \(\hat{\varepsilon}_t\) be the OLS
+residuals. The Newey--West covariance estimator can be written as:
+\begin{equation}
+\widehat{\mathrm{Var}}_{\mathrm{NW}}(\hat{\beta})
+=
+(X'X)^{-1}
+\left(
+\sum_{\ell=-L}^{L} w_\ell
+\sum_{t=|\ell|+1}^{T}
+x_t x_{t-|\ell|}' \hat{\varepsilon}_t \hat{\varepsilon}_{t-|\ell|}
+\right)
+(X'X)^{-1},
+\end{equation}
+where \(L\) is the truncation lag and the Bartlett weights are:
+\begin{equation}
+w_\ell = 1 - \frac{|\ell|}{L+1}.
+\end{equation}
+
+The script uses:
+\[
+L=5.
+\]
+
+\section{Reference-Style Event-Dummy Regression}
+
+\subsection{Smoothed CARDI Series}
+
+The script preserves the legacy plotting and regression logic from the earlier
+\texttt{Event\_test.R}. First, each CARDI series is smoothed using LOESS over
+the daily time index:
+\begin{equation}
+\widetilde{y}_t^{(q)}
+=
+\mathrm{LOESS}\left(y_t^{(q)}; \mathrm{span}=0.1\right).
+\end{equation}
+
+The dependent variable is the log change in smoothed CARDI:
+\begin{equation}
+\Delta \widetilde{y}_t^{(q)}
+=
+100 \times
+\left[
+\log\left(\widetilde{y}_t^{(q)}\right)
+-
+\log\left(\widetilde{y}_{t-1}^{(q)}\right)
+\right].
+\end{equation}
+
+\subsection{Trailing Event Dummy}
+
+For each lookback window \(m \in \{7,30,60\}\), define:
+\begin{equation}
+\text{DummyEvent}_{t,m}
+=
+\mathbf{1}
+\left\{
+\exists e_j \in \mathcal{E}
+\text{ such that }
+t-(m-1) \leq e_j \leq t
+\right\}.
+\end{equation}
+
+The regression is:
+\begin{equation}
+\Delta \widetilde{y}_t^{(q)}
+=
+\alpha
++ \theta_m \text{DummyEvent}_{t,m}
++ \eta_t.
+\end{equation}
+
+The coefficient \(\theta_m\) measures whether smoothed CARDI log changes are
+different on days following recent carbon-related events. The script reports
+Newey--West standard errors for \(\theta_m\).
+
+\section{Markov-Switching Regime Analysis}
+
+\subsection{Motivation}
+
+The Markov-switching model tests whether CARDI alternates between low-risk and
+high-risk latent regimes. The approach follows the regime-switching framework
+introduced by \citet{hamilton1989}.
+
+\subsection{Two-Regime Model}
+
+For each CARDI series, the script estimates a two-regime model:
+\begin{equation}
+y_t^{(q)}
+=
+\mu_{s_t}^{(q)} + \varepsilon_t,
+\qquad
+\varepsilon_t \sim N\left(0,\sigma_{s_t}^2\right),
+\end{equation}
+where \(s_t \in \{1,2\}\) is an unobserved Markov state.
+
+The state evolves according to:
+\begin{equation}
+\Pr(s_t=j \mid s_{t-1}=i)
+=
+p_{ij},
+\qquad i,j \in \{1,2\}.
+\end{equation}
+
+The transition matrix is:
+\begin{equation}
+P =
+\begin{pmatrix}
+p_{11} & p_{12}\\
+p_{21} & p_{22}
+\end{pmatrix}.
+\end{equation}
+
+\subsection{High-Risk Regime Identification}
+
+After estimation, the script extracts smoothed state probabilities:
+\[
+\Pr(s_t=j \mid \mathcal{F}_T),
+\]
+where \(\mathcal{F}_T\) denotes the full sample information set.
+
+The high-risk regime is defined as the regime with the higher
+probability-weighted CARDI mean:
+\begin{equation}
+j^\star
+=
+\arg\max_{j \in \{1,2\}}
+\frac{\sum_t \Pr(s_t=j \mid \mathcal{F}_T) y_t}
+{\sum_t \Pr(s_t=j \mid \mathcal{F}_T)}.
+\end{equation}
+
+The high-risk probability is:
+\begin{equation}
+\pi_t^{H}
+=
+\Pr(s_t=j^\star \mid \mathcal{F}_T).
+\end{equation}
+
+\subsection{Regime Switch Dates}
+
+For a threshold \(c \in \{0.5,0.8\}\), a switch into the high-risk regime is
+defined by:
+\begin{equation}
+\pi_t^H \geq c
+\quad \text{and} \quad
+\pi_{t-1}^H < c.
+\end{equation}
+
+Each switch date is matched to the nearest individual event and nearest event
+cluster. The script reports both calendar-day and trading-day distances.
+
+\section{Output Files}
+
+\begin{longtable}{ll}
+\toprule
+Output & Description\\
+\midrule
+\texttt{event\_clusters.xlsx} & Individual and clustered event metadata\\
+\texttt{chow\_known\_breakpoint\_tests.xlsx} & Known-breakpoint Chow test results\\
+\texttt{intervention\_newey\_west\_tests.xlsx} & Interrupted time-series regressions\\
+\texttt{reference\_event\_dummy\_newey\_west.xlsx} & Legacy event-dummy regressions with HAC SEs\\
+\texttt{markov\_switching\_results.xlsx} & Regime probabilities and switch-event matches\\
+\texttt{FRM\_Event.csv} & Smoothed CARDI series and log differences\\
+\texttt{RegEvent\_SmoothFRMDiff*.csv} & Reference event-dummy regression outputs\\
+\texttt{Plot\_Event.png} & Legacy CARDI event plot\\
+\texttt{MarkovSwitching\_CARDI\_*.png} & Markov regime probability plots\\
+\bottomrule
+\end{longtable}
+
+\section{Interpretation}
+
+The tests answer related but distinct questions. The Chow test asks whether the
+local regression relationship changes around a known event date. The
+interrupted time-series regressions decompose the event association into an
+immediate pulse, a persistent level shift, and a post-event trend change. The
+reference event-dummy model asks whether recent event occurrence predicts
+changes in smoothed CARDI. The Markov-switching model asks whether CARDI enters
+a high-risk latent regime and whether such regime transitions occur near known
+events.
+
+\section*{References}
+
+\begin{thebibliography}{9}
+
+\bibitem[Bernal, Cummins, and Gasparrini(2017)]{bernal2017}
+Bernal, J. L., Cummins, S., and Gasparrini, A. (2017).
+\newblock Interrupted time series regression for the evaluation of public
+health interventions: a tutorial.
+\newblock \emph{International Journal of Epidemiology}, 46(1), 348--355.
+\newblock \url{https://doi.org/10.1093/ije/dyw098}
+
+\bibitem[Chow(1960)]{chow1960}
+Chow, G. C. (1960).
+\newblock Tests of equality between sets of coefficients in two linear
+regressions.
+\newblock \emph{Econometrica}, 28(3), 591--605.
+\newblock \url{https://doi.org/10.2307/1910133}
+
+\bibitem[Hamilton(1989)]{hamilton1989}
+Hamilton, J. D. (1989).
+\newblock A new approach to the economic analysis of nonstationary time series
+and the business cycle.
+\newblock \emph{Econometrica}, 57(2), 357--384.
+\newblock \url{https://doi.org/10.2307/1912559}
+
+\bibitem[Newey and West(1987)]{neweywest1987}
+Newey, W. K., and West, K. D. (1987).
+\newblock A simple, positive semi-definite, heteroskedasticity and
+autocorrelation consistent covariance matrix.
+\newblock \emph{Econometrica}, 55(3), 703--708.
+\newblock \url{https://doi.org/10.2307/1913610}
+
+\end{thebibliography}
+
+\end{document}
