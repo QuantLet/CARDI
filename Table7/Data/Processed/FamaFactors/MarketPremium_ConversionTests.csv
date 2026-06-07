@@ -1,0 +1,4 @@
+"Test","Expected","Actual","Pass"
+"weekly compound RF conversion",0.000936139684073467,0.000936139684073467,TRUE
+"monthly compound RF conversion",0.00407412378364835,0.00407412378364835,TRUE
+"market premium subtraction",0.0990638603159265,0.0990638603159265,TRUE

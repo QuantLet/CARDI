@@ -1,0 +1,5 @@
+"frequency","indicator_name","cardi_column_used","horizon","forecast_lag","transformation","dependent_variable","cardi_coefficient","newey_west_t_stat","newey_west_p_value","adjusted_r_squared","n_observations","positive_coefficient","significant_10pct","significant_5pct","significant_1pct"
+"daily","Eigenvector_HL_Ratio","CARDI_5P",1,1,"none","future_1_period_change_in_Eigenvector_HL_Ratio",0.549411627586054,2.17333586687922,0.0298524552075674,0.419655405550855,2406,TRUE,TRUE,TRUE,FALSE
+"daily","Eigenvector_HL_Ratio","CARDI_5P",5,1,"none","future_5_period_change_in_Eigenvector_HL_Ratio",0.625123742092943,2.29478940800828,0.0218312713129348,0.453367627609976,2400,TRUE,TRUE,TRUE,FALSE
+"daily","Eigenvector_HL_Ratio","CARDI_5P",10,1,"none","future_10_period_change_in_Eigenvector_HL_Ratio",0.713088658004419,2.64441284513756,0.00823676754165487,0.455110768440757,2396,TRUE,TRUE,TRUE,TRUE
+"daily","Eigenvector_HL_Ratio","CARDI_5P",20,1,"none","future_20_period_change_in_Eigenvector_HL_Ratio",0.91112052502916,3.35370558954463,0.000809852104639112,0.472337014943336,2386,TRUE,TRUE,TRUE,TRUE

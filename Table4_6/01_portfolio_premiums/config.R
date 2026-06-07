@@ -1,0 +1,31 @@
+# Portfolio-premium stage config.
+# This stage uses only files stored under 00_Submit/Table4.
+
+portfolio_table4_dir <- function() {
+  if (exists("TABLE4_STAGE_DIR", inherits = TRUE)) {
+    return(normalizePath(file.path(get("TABLE4_STAGE_DIR", inherits = TRUE), ".."),
+                         mustWork = TRUE))
+  }
+
+  cwd <- normalizePath(getwd(), mustWork = TRUE)
+  if (basename(cwd) == "01_portfolio_premiums") {
+    return(normalizePath(file.path(cwd, ".."), mustWork = TRUE))
+  }
+  if (basename(cwd) == "Table4") {
+    return(cwd)
+  }
+
+  candidate <- file.path(cwd, "00_Submit", "Table4")
+  if (dir.exists(candidate)) {
+    return(normalizePath(candidate, mustWork = TRUE))
+  }
+
+  stop("Could not locate 00_Submit/Table4 from: ", cwd)
+}
+
+normalize_frequency <- function(frequency) {
+  frequency <- tolower(as.character(frequency)[1])
+  if (frequency %in% c("m", "month", "monthly")) return("monthly")
+  if (frequency %in% c("w", "week", "weekly")) return("weekly")
+  stop("Unsupported frequency: ", frequency)
+}

@@ -1,6 +1,7 @@
+
 Name of Quantlet: CARDI
-Published in: 'Non'
-Description: 'Code for Measuring Carbon Risk Dynamics'
-Keywords: 'FRM, R, carbon risk, TE, Application, Plot'
-Author: 'Ruting Rainy WANG' 
-Submitted:  '22.05.2026'
+Published in: Non
+Description: Code for Measuring Carbon Risk Dynamics
+Keywords: FRM, R, carbon risk, TE, Application, Plot
+Author: Ruting Rainy WANG
+Submitted: 07.06.2026
